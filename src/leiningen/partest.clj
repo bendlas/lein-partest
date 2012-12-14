@@ -35,18 +35,22 @@
        ~(emit-warmup fs ws)
        (dotimes ~[ns ps] ~(emit-run fs ns)))))
 
-(defn one-process [project f p w req form msg]
+(defn one-process [project f p w req form msg exit]
   (eval/eval-in-project
    project
    `(do (print "#####################" ~msg) (flush)
-        (~form ~f ~p ~w))
+        (~form ~f ~p ~w)
+        (flush)
+        ~exit)
    req))
 
-(defn multi-process [project f p w req msg]
+(defn multi-process [project f p w req msg exit]
   (print "#####################" msg) (flush)
   (let [fus (mapv (fn [n] (future (eval/eval-in-project
                                   project
-                                  `(~par-process-form ~f ~n ~w)
+                                  `(do (~par-process-form ~f ~n ~w)
+                                       (flush)
+                                       ~exit)
                                   req)))
                   (range p))]
     (doseq [fu fus]
@@ -59,9 +63,15 @@
         p (Long/parseLong parallelism)
         w (Long/parseLong (or warmup "2"))
         req `(require '~(symbol (namespace f)))]
-    (one-process project f p w req ser-form "Run serial ...")
-    (one-process project f p w req par-future-form "Run parallel, same classloader ...")
+    (one-process (assoc project :eval-in 'subprocess)
+                 f p w req ser-form "Run serial ..."
+                 `(System/exit 0))
+    (one-process (assoc project :eval-in 'subprocess)
+                 f p w req par-future-form "Run parallel, same classloader ..."
+                 `(System/exit 0))
     (multi-process (assoc project :eval-in 'classloader)
-                   f p w req "Run parallel, distinct classloaders ...")
+                   f p w req "Run parallel, distinct classloaders ..."
+                   nil)
     (multi-process (assoc project :eval-in 'subprocess)
-                   f p w req "Run parallel, distinct processes ...")))
+                   f p w req "Run parallel, distinct processes ..."
+                   `(System/exit 0))))

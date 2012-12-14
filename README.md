@@ -11,7 +11,9 @@ project.clj or your `:user` profile accordingly.
 
 ## Invokation
 
-    $ lein partest <qualified-ns-sym> <parallel-runs> [<warmup-runs>]
+    $ lein partest <qualified-fn-sym> <parallel-runs> [<warmup-runs>]
+
+`qualified-fn-sym` names a function taking one numeric argument which is its run number.
 
 e.g. to test with a parallelism of 4 and a default of two warmup runs
 
